@@ -1,0 +1,88 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>XCOIN PWA</title>
+    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-messaging-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.10.0/firebase-firestore-compat.js"></script>
+    <script>
+      const firebaseConfig = {
+        apiKey: "AIzaSyC4JM9e8DGTpEPwuzaVQbcu9PH008MeuVQ",
+        authDomain: "xcoin-pwa.firebaseapp.com",
+        projectId: "xcoin-pwa",
+        messagingSenderId: "628331107420",
+        appId: "1:628331107420:web:a32ee0116737efa072c299"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const messaging = firebase.messaging();
+      const db = firebase.firestore();
+
+      function saveTokenToFirestore(token) {
+        db.collection("tokens").add({
+          token: token,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('firebase-messaging-sw.js')
+        .then(registration => {
+          Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+              messaging.getToken({
+                vapidKey: 'BK9bDs8eZfHFTEEahKFSOqBaQBIXCzl-gs65jnieg4i0MEG0rPv7tQoK7dOSWobsUSeFse_hL4RfUNR4BD2K9mM',
+                serviceWorkerRegistration: registration
+              }).then((token) => {
+                console.log("✅ FCM Token:", token);
+                saveTokenToFirestore(token);
+              });
+            }
+          });
+        });
+      }
+
+      async function fetchOrders() {
+        try {
+          const res = await fetch("https://bizbuddy.co.th/xcoin/wp-json/myapp/v1/processing-orders");
+          const data = await res.json();
+          renderOrders(data);
+        } catch (err) {
+          document.getElementById('list').innerHTML = "❌ ไม่สามารถโหลดข้อมูลได้";
+        }
+      }
+
+      function renderOrders(data) {
+        const list = document.getElementById('list');
+        if (data.length === 0) {
+          list.innerHTML = "<p style='color:white'>ยังไม่มีรายการชำระเงิน</p>";
+          return;
+        }
+        list.innerHTML = data.map(item => `
+          <div style="background:#fff;margin:12px;padding:16px;border-radius:12px;">
+            <div style="display:flex;justify-content:space-between;">
+              <b>บริษัท: ${item.customer_name || '-'}</b>
+              <button onclick="copy('${item.customer_name}')">COPY</button>
+            </div>
+            <div>ยอดเงิน: ฿${item.total}</div>
+            <div>ออเดอร์ #${item.order_id}</div>
+            <div>เวลาชำระ: ${new Date(item.date_created).toLocaleString('th-TH')}</div>
+          </div>
+        `).join("");
+      }
+
+      function copy(txt) {
+        navigator.clipboard.writeText(txt);
+        alert("คัดลอกแล้ว: " + txt);
+      }
+
+      window.onload = fetchOrders;
+    </script>
+  </head>
+  <body style="background:#111;color:#fff;padding:2rem;">
+    <h1>XCOIN Processing Orders</h1>
+    <div id="list">📦 กำลังโหลดรายการ...</div>
+  </body>
+</html>
